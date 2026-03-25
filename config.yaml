@@ -1,0 +1,9 @@
+model: qwen
+guard: entroguard
+dataset: toy
+
+generation:
+  max_tokens: 150
+
+retrieval:
+  top_k: 2
