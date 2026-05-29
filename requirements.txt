@@ -1,0 +1,9 @@
+datasets
+faiss-cpu
+numpy
+pandas
+pyyaml
+sentence-transformers
+torch
+transformers
+accelerate

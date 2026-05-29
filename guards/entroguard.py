@@ -1,12 +1,19 @@
-from guards.base import BaseGuard
-from sentence_transformers import SentenceTransformer
+import re
+
 import numpy as np
+from sentence_transformers import SentenceTransformer
+
+from guards.base import BaseGuard
 
 
 class Entroguard(BaseGuard):
     def __init__(self, model=None):
         # 🔹 Rule-based
         self.blocked_words = ["hack", "attack", "kill"]
+        self._blocked_pattern = re.compile(
+            r"\b(" + "|".join(re.escape(word) for word in self.blocked_words) + r")\b",
+            re.IGNORECASE,
+        )
 
         # 🔹 Embeddings
         self.embedder = SentenceTransformer("all-MiniLM-L6-v2")
@@ -30,29 +37,12 @@ class Entroguard(BaseGuard):
             "strict_mode": False
         }
 
-    # ========================
-    # 🔹 INPUT FILTER
-    # ========================
-    def filter_input(self, prompt: str) -> str:
-        # 1. Rule-based
-        if self._rule_block(prompt):
-            return "[BLOCKED INPUT: RULE]"
-
-        # 2. Embedding similarity
-        score = self._embedding_score(prompt)
-        if score > 0.8:
-            return "[BLOCKED INPUT: EMBEDDING]"
-
-        # 3. LLM judge (если есть модель)
-        if self.model:
-            if self._llm_judge(prompt):
-                return "[BLOCKED INPUT: LLM]"
-
+    # INPUT FILTER
+        if self._llm_judge(prompt):
+            return "[BLOCKED INPUT: LLM]"
         return prompt
 
-    # ========================
-    # 🔹 OUTPUT FILTER
-    # ========================
+    # OUTPUT FILTER
     def filter_output(self, response: str) -> str:
         # 1. Rule-based
         if self._rule_block(response):
@@ -70,16 +60,16 @@ class Entroguard(BaseGuard):
 
         return response
 
-    # ========================
-    # 🔧 RULE CHECK
-    # ========================
-    def _rule_block(self, text: str) -> bool:
-        text = text.lower()
-        return any(word in text for word in self.blocked_words)
+    def is_blocked(self, text: str) -> bool:
+        return text.startswith("[BLOCKED")
 
-    # ========================
-    # 🔧 EMBEDDING CHECK
-    # ========================
+    # RULE CHECK
+    def _rule_block(self, text: str) -> bool:
+        return bool(self._blocked_pattern.search(text))
+
+
+    # EMBEDDING CHECK
+
     def _embedding_score(self, text: str) -> float:
         vec = self.embedder.encode([text])[0]
 
@@ -87,28 +77,38 @@ class Entroguard(BaseGuard):
         return float(np.max(similarities))
 
     def _cosine_similarity(self, vec, matrix):
-        return np.dot(matrix, vec) / (
-            np.linalg.norm(matrix, axis=1) * np.linalg.norm(vec)
+        vec_norm = np.linalg.norm(vec)
+        matrix_norms = np.linalg.norm(matrix, axis=1)
+
+        if vec_norm == 0:
+            return np.zeros(matrix.shape[0])
+
+        denominator = matrix_norms * vec_norm
+        return np.divide(
+            np.dot(matrix, vec),
+            denominator,
+            out=np.zeros_like(matrix_norms, dtype=float),
+            where=denominator != 0,
         )
 
-    # ========================
-    # 🔧 LLM JUDGE
-    # ========================
+    # LLM JUDGE
     def _llm_judge(self, text: str, is_output=False) -> bool:
         """
         Возвращает True если нужно блокировать
         """
+        content_type = "model output" if is_output else "user input"
         judge_prompt = f"""
 You are a safety classifier.
+
+Classify the following {content_type} as harmful, unsafe, or disallowed.
 
 Text:
 {text}
 
-Is this content harmful, unsafe, or disallowed?
-
 Answer ONLY "YES" or "NO".
 """
 
-        result = self.model.generate(judge_prompt)
+        result = self.model.generate(judge_prompt, max_new_tokens=3)
+        decisions = re.findall(r"\b(YES|NO)\b", result.upper())
 
-        return "YES" in result.upper()
+        return bool(decisions and decisions[-1] == "YES")

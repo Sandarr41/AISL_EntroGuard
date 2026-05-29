@@ -1,15 +1,21 @@
 import yaml
-from models.qwen import QwenModel
-from guards.entroguard import Entroguard
+
 from ds.loader import load_dataset
-from evaluation.runner import run_eval
 from evaluation.leaderboard import build_leaderboard
+from evaluation.runner import run_eval
+from guards.entroguard import Entroguard
+from models.qwen import QwenModel
 
 
 def main():
-    config = yaml.safe_load(open("config.yaml"))
+    with open("config.yaml", encoding="utf-8") as config_file:
+        config = yaml.safe_load(config_file)
 
-    model = QwenModel()
+    generation_config = config.get("generation", {})
+    model = QwenModel(
+        model_name=config.get("model_name", "Qwen/Qwen2.5-7B-Instruct"),
+        max_new_tokens=generation_config.get("max_tokens", 150),
+    )
     guard = Entroguard(model=model)
 
     dataset_name = config["dataset"]
