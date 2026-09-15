@@ -1,0 +1,12 @@
+[project]
+name = "entro"
+version = "0.1.0"
+description = "EntroGuard: защита текстовых эмбеддингов от Embedding Inversion Attack (учебный практикум)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.5.3",
+    "torch>=2.14.0",
+    "matplotlib>=3.9",
+    "datasets>=3.0",
+]

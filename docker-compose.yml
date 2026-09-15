@@ -1,0 +1,29 @@
+# Convenience wrapper around the docker run command in Dockerfile's header
+# comment. Requires the NVIDIA Container Toolkit on the host for the GPU
+# reservation below; delete the `deploy:` block to run CPU-only.
+#
+#   docker compose up --build
+#   open http://localhost:8000
+
+services:
+  entroguard:
+    build:
+      context: .
+      args:
+        CUDA_TAG: cu124   # match your driver: cu121 / cu124 / cu126 / ...
+    ports:
+      - "8000:8000"
+    volumes:
+      - hf_cache:/root/.cache/huggingface
+      - ./checkpoints:/app/checkpoints
+      - ./results:/app/results
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  hf_cache:

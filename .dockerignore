@@ -1,0 +1,10 @@
+.venv/
+.idea/
+.git/
+__pycache__/
+*.pyc
+checkpoints/
+results/
+runs/
+Dockerfile
+.dockerignore
