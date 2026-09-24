@@ -1,0 +1,37 @@
+{
+  "none": {
+    "BLEU-2": 0.20566757211170228,
+    "ROUGE-1": 0.4990102327907258,
+    "EMR": 0.0,
+    "retrieval_recall@5": 1.0,
+    "ms_per_1k_queries": 2.6450001314515248e-05
+  },
+  "gaussian": {
+    "BLEU-2": 0.0918596025958575,
+    "ROUGE-1": 0.38697649994826766,
+    "EMR": 0.0,
+    "retrieval_recall@5": 0.3468,
+    "ms_per_1k_queries": 8.523153825000009
+  },
+  "pgd": {
+    "BLEU-2": 0.004974361524159364,
+    "ROUGE-1": 0.2627021818706164,
+    "EMR": 0.0,
+    "retrieval_recall@5": 0.3996,
+    "ms_per_1k_queries": 6.059548524999627
+  },
+  "entroguard_transformer(zero-shot)": {
+    "BLEU-2": 0.09376292069635474,
+    "ROUGE-1": 0.40511439761237844,
+    "EMR": 0.0,
+    "retrieval_recall@5": 0.17880000000000001,
+    "ms_per_1k_queries": 2.603183450000415
+  },
+  "entroguard_lstm(native)": {
+    "BLEU-2": 0.004293433383326536,
+    "ROUGE-1": 0.24168040000747967,
+    "EMR": 0.0,
+    "retrieval_recall@5": 0.35440000000000005,
+    "ms_per_1k_queries": 4.089899600001445
+  }
+}
