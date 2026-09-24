@@ -3,14 +3,17 @@
 # reservation below; delete the `deploy:` block to run CPU-only.
 #
 #   docker compose up --build
-#   open http://localhost:8000
+#   open http://localhost:8000 -- "Демо" tab is a live attack/defense
+#   playground on real checkpoints (mount checkpoints/ with at least
+#   attacker_transformer_seed*.pt + entroguard_transformer_seed*.pt, or
+#   train them first from the "Пайплайн" tab)
 
 services:
   entroguard:
     build:
       context: .
       args:
-        CUDA_TAG: cu124   # match your driver: cu121 / cu124 / cu126 / ...
+        CUDA_TAG: cu130   # cu130 = what works on Blackwell (RTX 50-series); older cards: cu121 / cu124 / cu126
     ports:
       - "8000:8000"
     volumes:

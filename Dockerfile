@@ -4,9 +4,13 @@
 # (using uv.lock for reproducibility), then swaps in a CUDA build of torch
 # since the default PyPI wheel uv.lock resolves to is CPU-only.
 #
-# Build (adjust CUDA_TAG to match your driver -- cu121/cu124/cu126/...,
-# see https://pytorch.org/get-started/locally/):
-#   docker build --build-arg CUDA_TAG=cu124 -t entroguard .
+# Build (adjust CUDA_TAG to match your driver -- cu121/cu124/cu126/cu130/...,
+# see https://pytorch.org/get-started/locally/). Default below (cu130) is
+# what actually works on Blackwell cards (RTX 50-series, compute
+# capability sm_120) -- cu124/cu126 install fine but silently lack Blackwell
+# kernels and fall back to CPU-speed matmuls; older cards should still work
+# fine on cu130, but drop back to cu121/cu124 if your driver is too old for it:
+#   docker build --build-arg CUDA_TAG=cu130 -t entroguard .
 #
 # Run (needs the NVIDIA Container Toolkit on the host for --gpus to work;
 # without a GPU, drop --gpus all and the code falls back to CPU):
@@ -17,7 +21,12 @@
 #     entroguard
 #
 # Then open http://localhost:8000 -- the web dashboard (app.py) is the
-# default CMD. Override it to run a single script instead, e.g.:
+# default CMD: "Пайплайн" launches training steps, "Результаты" shows the
+# report, "Демо" is a live attack/defense playground on real trained
+# checkpoints (needs at least attacker_transformer + entroguard_transformer
+# for some seed -- mount a checkpoints/ that already has them, or train them
+# from the "Пайплайн" tab first). Override the CMD to run a single script
+# instead, e.g.:
 #   docker run --gpus all entroguard python train_attacker.py --arch transformer
 
 FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
@@ -47,7 +56,7 @@ RUN uv venv --python 3.12 .venv && \
 
 # uv.lock resolves torch from PyPI, which is CPU-only -- reinstall it from
 # the CUDA wheel index for the same version, GPU build.
-ARG CUDA_TAG=cu124
+ARG CUDA_TAG=cu130
 RUN uv pip install --python .venv/bin/python \
         --index-url https://download.pytorch.org/whl/${CUDA_TAG} \
         --no-deps --force-reinstall torch

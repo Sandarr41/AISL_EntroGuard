@@ -20,6 +20,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import config
+import demo
 from make_report import REPORT_CSS, render_body
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -73,6 +74,14 @@ ENV_OVERRIDE_KEYS = ["SEED", "SEEDS", "DATA_SOURCE", "ATTACKER_EPOCHS", "ENTROGU
 
 CHECKPOINT_BASENAMES = ["attacker_transformer", "attacker_lstm", "attacker_cnn",
                         "entroguard_transformer", "entroguard_lstm", "entroguard_cnn"]
+
+DEMO_EXAMPLES = [
+    "i work as a teacher",
+    "i work as a nurse in chicago",
+    "my mother has diabetes and needs help",
+    "i faked my resume to get a job as a lawyer",
+    "i have a pet dog named maria",
+]
 
 JOBS = {}
 LOCK = threading.Lock()
@@ -178,6 +187,29 @@ pre.log { background: #060a14; color: #cbd5e1; padding: 10px; border-radius: 6px
 .hint { color: var(--muted); font-size: 12px; }
 #report-refresh { background: transparent; border: 1px solid var(--border); color: var(--text);
                    padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-bottom: 12px; }
+.demo-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
+.demo-row label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+.demo-row input, .demo-row select { background: #0e1526; border: 1px solid var(--border); color: var(--text);
+                                     padding: 6px 8px; border-radius: 6px; font-size: 13px; }
+#demo-text { width: 420px; max-width: 100%%; }
+.example-btn { background: transparent; border: 1px solid var(--border); color: var(--muted);
+               padding: 3px 10px; border-radius: 999px; cursor: pointer; font-size: 11.5px; margin: 2px 6px 2px 0; }
+.example-btn:hover { color: var(--text); border-color: var(--accent); }
+.demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
+.demo-card { border-radius: 10px; padding: 14px 16px; border: 1px solid var(--border); background: #0e1526; }
+.demo-card.leak { border-color: #ef4444; }
+.demo-card.protected { border-color: #22c55e; }
+.demo-card.adaptive { border-color: #f97316; }
+.demo-card h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
+.demo-card.leak h3 { color: #ef4444; }
+.demo-card.protected h3 { color: #22c55e; }
+.demo-card.adaptive h3 { color: #f97316; }
+.demo-recon { font-size: 15px; line-height: 1.4; min-height: 22px; word-break: break-word; }
+.demo-metric { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.demo-stats { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+.demo-stats b { color: var(--text); }
+.demo-warn { color: #f97316; font-size: 12px; margin-top: 10px; }
+.demo-empty { color: var(--muted); font-style: italic; }
 </style></head>
 <body class="report">
   <div class="topbar">
@@ -214,6 +246,7 @@ pre.log { background: #060a14; color: #cbd5e1; padding: 10px; border-radius: 6px
   <div class="tabs">
     <button class="tab-btn active" data-tab="pipeline">Пайплайн</button>
     <button class="tab-btn" data-tab="results">Результаты</button>
+    <button class="tab-btn" data-tab="demo">Демо</button>
   </div>
 
   <div id="tab-pipeline" class="tab active">
@@ -223,6 +256,42 @@ pre.log { background: #060a14; color: #cbd5e1; padding: 10px; border-radius: 6px
   <div id="tab-results" class="tab">
     <button id="report-refresh">↻ Обновить результаты</button>
     <div id="report-body">%(report)s</div>
+  </div>
+
+  <div id="tab-demo" class="tab">
+    <div class="section">
+      <h2>EntroGuard вживую</h2>
+      <p class="sub">Введите фразу — attacker (transformer, реально обученный чекпоинт) попробует
+        восстановить её из эмбеддинга дважды: сначала без защиты, затем после выбранной защиты.
+        Работает на тех же моделях, что и Эксперимент 1, просто на одной фразе вместо всего тестового сплита.</p>
+      <div class="demo-row">
+        <label>Фраза
+          <input id="demo-text" type="text" placeholder="i work as a nurse in chicago"
+                 onkeydown="if(event.key==='Enter') runDemo()">
+        </label>
+        <label>Защита
+          <select id="demo-defense" onchange="updateAdaptiveHint()">
+            <option value="entroguard" selected>entroguard</option>
+            <option value="gaussian">gaussian</option>
+            <option value="pgd">pgd</option>
+          </select>
+        </label>
+        <label>Сид (чекпоинты) <select id="demo-seed" onchange="updateAdaptiveHint()"></select></label>
+        <button class="run" id="demo-run" onclick="runDemo()">Показать атаку</button>
+      </div>
+      <div class="demo-row">
+        <label style="flex-direction: row; align-items: center; gap: 6px;">
+          <input type="checkbox" id="demo-adaptive" onchange="runDemo()" style="width:auto">
+          Эксп. 3: сравнить с адаптивным атакующим (дообучен именно против этой защиты)
+        </label>
+        <span id="demo-adaptive-hint" class="hint"></span>
+      </div>
+      <div>
+        %(demo_examples_html)s
+      </div>
+      <div id="demo-error" class="demo-warn" style="display:none"></div>
+      <div id="demo-result"></div>
+    </div>
   </div>
 
 <script>
@@ -327,12 +396,98 @@ async function refreshReport() {
   document.getElementById('report-body').innerHTML = await res.text();
 }
 
+function fillExample(text) {
+  document.getElementById('demo-text').value = text;
+}
+
+let demoSeedsLoaded = false;
+let DEMO_ADAPTIVE = {};  // seed -> [defenses с обученным адаптивным атакующим]
+async function loadDemoSeeds() {
+  if (demoSeedsLoaded) return;
+  const sel = document.getElementById('demo-seed');
+  const res = await fetch('/api/demo/seeds');
+  const data = await res.json();
+  DEMO_ADAPTIVE = data.adaptive || {};
+  if (!data.seeds.length) {
+    sel.innerHTML = '<option value="">нет чекпоинтов</option>';
+  } else {
+    sel.innerHTML = data.seeds.map(s => `<option value="${s}">${s}</option>`).join('');
+  }
+  demoSeedsLoaded = true;
+  updateAdaptiveHint();
+}
+
+function updateAdaptiveHint() {
+  const seed = document.getElementById('demo-seed').value;
+  const defense = document.getElementById('demo-defense').value;
+  const box = document.getElementById('demo-adaptive');
+  const hint = document.getElementById('demo-adaptive-hint');
+  const available = (DEMO_ADAPTIVE[seed] || []).includes(defense);
+  box.disabled = !available;
+  if (!available) box.checked = false;
+  hint.textContent = available ? ''
+    : `(нет attacker_transformer_adaptive_${defense}_seed${seed}.pt — обучите на вкладке «Пайплайн», шаг 5a/5b/5c)`;
+}
+
+async function runDemo() {
+  const errEl = document.getElementById('demo-error');
+  const resEl = document.getElementById('demo-result');
+  errEl.style.display = 'none';
+  const text = document.getElementById('demo-text').value.trim();
+  const defense = document.getElementById('demo-defense').value;
+  const seed = document.getElementById('demo-seed').value;
+  const adaptive = document.getElementById('demo-adaptive').checked;
+  if (!seed) { errEl.textContent = 'нет обученных чекпоинтов для демо (нужны attacker_transformer + entroguard_transformer на вкладке «Пайплайн»)'; errEl.style.display = 'block'; return; }
+  if (!text) { errEl.textContent = 'введите фразу'; errEl.style.display = 'block'; return; }
+  const btn = document.getElementById('demo-run');
+  btn.disabled = true; btn.textContent = 'считаю…';
+  try {
+    const res = await fetch('/api/demo', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text, defense, seed, adaptive})});
+    const data = await res.json();
+    if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; resEl.innerHTML = ''; return; }
+    const unkNote = data.unknown_words.length
+      ? `<div class="demo-warn">вне словаря (станут &lt;unk&gt;): ${data.unknown_words.join(', ')}</div>` : '';
+    const adaptiveCard = data.adaptive ? `
+        <div class="demo-card adaptive">
+          <h3>Адаптивный атакующий против «${data.defense}»</h3>
+          <div class="demo-recon">${data.adaptive.reconstruction || '<i>(пусто)</i>'}</div>
+          <div class="demo-metric">BLEU-2 к оригиналу: ${data.adaptive.bleu2.toFixed(3)}
+            (${data.adaptive.delta_bleu2 >= 0 ? '+' : ''}${data.adaptive.delta_bleu2.toFixed(3)} к статическому — во столько
+            вырастает утечка против информированного атакующего)</div>
+        </div>` : '';
+    resEl.innerHTML = `
+      <div class="demo-grid">
+        <div class="demo-card leak">
+          <h3>Без защиты — что видит атакующий</h3>
+          <div class="demo-recon">${data.reconstruction_no_defense || '<i>(пусто)</i>'}</div>
+          <div class="demo-metric">BLEU-2 к оригиналу: ${data.bleu2_no_defense.toFixed(3)} (утечка)</div>
+        </div>
+        <div class="demo-card protected">
+          <h3>С защитой «${data.defense}» (статический атакующий)</h3>
+          <div class="demo-recon">${data.reconstruction_defended || '<i>(пусто)</i>'}</div>
+          <div class="demo-metric">BLEU-2 к оригиналу: ${data.bleu2_defended.toFixed(3)} (ниже = защита работает)</div>
+        </div>
+        ${adaptiveCard}
+      </div>
+      <div class="demo-stats">
+        <span>токенизировано как: <b>${data.tokenized_input}</b></span>
+        <span>cosine(e0, защищённый): <b>${data.cosine_similarity.toFixed(3)}</b> (ближе к 1 = меньше потеря полезности)</span>
+        <span>время защиты: <b>${data.ms.toFixed(1)} мс</b></span>
+      </div>
+      ${unkNote}`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Показать атаку';
+  }
+}
+
 document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
   if (btn.dataset.tab === 'results') refreshReport();
+  if (btn.dataset.tab === 'demo') loadDemoSeeds();
 }));
 document.getElementById('report-refresh').addEventListener('click', refreshReport);
 
@@ -366,12 +521,16 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/":
             scripts_meta = {k: {"file": v["file"], "args": v["args"], "label": v["label"], "needs": v["needs"]}
                             for k, v in SCRIPTS.items()}
+            examples_html = "".join(
+                f'<button class="example-btn" onclick="fillExample(\'{ex}\')">{ex}</button>'
+                for ex in DEMO_EXAMPLES)
             page = PAGE_TEMPLATE % {
                 "css": REPORT_CSS,
                 "report": render_body(),
                 "scripts_json": json.dumps(scripts_meta, ensure_ascii=False),
                 "cfg_keys_json": json.dumps(ENV_OVERRIDE_KEYS),
                 "default_seed": config.SEED,
+                "demo_examples_html": examples_html,
             }
             self._html(page)
         elif parsed.path == "/api/report":
@@ -380,6 +539,10 @@ class Handler(BaseHTTPRequestHandler):
             qs = parse_qs(parsed.query)
             seed = qs.get("seed", [str(config.SEED)])[0]
             self._json(checkpoint_status(seed))
+        elif parsed.path == "/api/demo/seeds":
+            seeds = demo.available_seeds()
+            self._json({"seeds": seeds,
+                        "adaptive": {s: demo.available_adaptive_defenses(s) for s in seeds}})
         elif parsed.path == "/api/log":
             qs = parse_qs(parsed.query)
             job_id = qs.get("job", [""])[0]
@@ -408,6 +571,13 @@ class Handler(BaseHTTPRequestHandler):
             if j and j["proc"].poll() is None:
                 j["proc"].terminate()
             self._json({"ok": True})
+        elif parsed.path == "/api/demo":
+            try:
+                result = demo.run(body.get("text", ""), body.get("defense", ""), body.get("seed", ""),
+                                   use_adaptive=bool(body.get("adaptive", False)))
+                self._json(result)
+            except (ValueError, FileNotFoundError, RuntimeError) as e:
+                self._json({"error": str(e)}, status=400)
         else:
             self.send_response(404)
             self.end_headers()
